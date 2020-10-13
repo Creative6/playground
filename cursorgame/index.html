@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cursor Game</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.9/vue.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+    <style>
+      ::-webkit-scrollbar {
+        width: 2px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: hsla(0, 0%, 39.2%, 0.5);
+      }
+
+      ::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+
+      html,
+      body {
+        font-family: Open Sans, Corbel, Lucida Grande, Lucida Sans Unicode,
+          Lucida Sans, DejaVu Sans, Bitstream Vera Sans, Liberation Sans,
+          Verdana, Verdana Ref, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #000;
+        font-size: 12px;
+        color: #ccc;
+      }
+
+      * {
+        box-sizing: border-box;
+        cursor: none;
+      }
+
+      .cursor {
+        width: 20px;
+        height: 20px;
+        text-align: center;
+        line-height: 20px;
+        border-radius: 20px;
+        background: red;
+        color: #000;
+        position: fixed;
+        box-shadow: 0 0 20px #fff, -20px 0 80px #f0f, 20px 0 80px #0ff,
+          inset 0 0 50px #fff, inset 50px 0 80px #f0f, inset -50px 0 80px #0ff,
+          inset 50px 0 300px #f0f, inset -50px 0 300px #0ff;
+      }
+
+      #app {
+        position: fixed;
+        left: 0px;
+        top: 0px;
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app" @mousemove="move">
+      <!-- <div
+        class="cursor"
+        :style="{'transform':'translate3d('+pageX+'px, '+pageY+'px, 0px)'}"
+      ></div> -->
+      <div class="cursor" v-for="item in list" :id="item" :key="item">
+        {{item.slice(-2)}}
+      </div>
+    </div>
+    <script>
+      let socket
+      const App = new Vue({
+        el: "#app",
+        created() {
+          socket = io("http://47.99.97.247:3333")
+          socket.on("set_mouse_position", (data) => {
+            const { mouseObject, pageX, pageY, id, color } = data
+            this.list = Object.keys(mouseObject)
+            if (document.getElementById(id)) {
+              document.getElementById(
+                id
+              ).style.transform = `translate3d(${pageX}px, ${pageY}px, 0px)`
+            }
+          })
+        },
+        data() {
+          return {
+            pageX: 100,
+            pageY: 100,
+            list: [],
+          }
+        },
+        methods: {
+          move(e) {
+            const { pageX, pageY } = e
+            this.pageX = pageX
+            this.pageY = pageY
+            socket.emit("mouse_move", { pageX, pageY })
+          },
+        },
+        mounted() {},
+      })
+    </script>
+  </body>
+</html>

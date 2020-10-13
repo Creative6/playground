@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.9/vue.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/axios/0.9.1/axios.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.9.0/moment.js"></script>
+    <style>
+      ::-webkit-scrollbar {
+        width: 2px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: hsla(0, 0%, 39.2%, 0.5);
+      }
+
+      ::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+
+      html,
+      body {
+        font-family: Open Sans, Corbel, Lucida Grande, Lucida Sans Unicode,
+          Lucida Sans, DejaVu Sans, Bitstream Vera Sans, Liberation Sans,
+          Verdana, Verdana Ref, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #000;
+        font-size: 12px;
+        color: #ccc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      .icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50px;
+      }
+
+      .content {
+        flex: 1;
+        overflow: auto;
+        background: #555;
+        padding: 15px;
+      }
+
+      .footer {
+        height: 30px;
+        background: #333;
+        display: flex;
+      }
+
+      .footer > input {
+        flex: 1;
+        outline: none;
+        border: none;
+        background: #444;
+        color: #bbb;
+        font-size: 12px;
+        padding: 0px 10px;
+      }
+
+      .footer > button {
+        outline: none;
+        border: none;
+        background: #333;
+        color: #18ce18;
+        font-size: 12px;
+        cursor: pointer;
+        width: 100px;
+        text-align: center;
+      }
+
+      #app {
+        position: fixed;
+        width: 700px;
+        height: 500px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        display: flex;
+      }
+
+      .left {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .personList {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+      }
+
+      .personList > img {
+        width: 30px;
+        height: 30px;
+        border-radius: 30px;
+        margin-right: 10px;
+      }
+
+      .personList > div {
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      .messageList {
+        display: flex;
+        margin-bottom: 15px;
+      }
+
+      .messageListMe {
+        flex-direction: row-reverse;
+      }
+
+      .messageList > img {
+        width: 30px;
+        height: 30px;
+        border-radius: 30px;
+      }
+
+      .messageBox {
+        flex: 1;
+        padding: 0px 10px;
+      }
+
+      .messageBoxMe {
+        text-align: right;
+      }
+
+      .messageTop {
+        color: #83b98c;
+      }
+
+      .messageBottom {
+        margin-top: 3px;
+      }
+
+      .dot {
+        color: #aaa;
+      }
+
+      .right {
+        width: 150px;
+        background: #222;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .rightTop {
+        flex: 1;
+        overflow: auto;
+      }
+
+      .rightBottom {
+        height: 30px;
+        background: #111;
+        text-align: center;
+        line-height: 30px;
+        color: red;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="left">
+        <div class="content">
+          <div
+            v-for="(item,index) in messageList"
+            :key="index"
+            :class="['messageList',item.username===username&&'messageListMe']"
+          >
+            <img :src="item.usericon" alt="" />
+            <div
+              :class="['messageBox',item.username===username&&'messageBoxMe']"
+            >
+              <div class="messageTop">
+                {{item.username}}
+                <span class="dot">●</span>
+                {{moment(item.time).format('YY/MM/DD HH:mm:ss')}}
+              </div>
+              <div class="messageBottom">{{item.message}}</div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <input
+            type="text"
+            v-model="message"
+            placeholder="Enter what you want to send here"
+            @keyup.enter="commit"
+            maxlength="30"
+          />
+          <button @click="commit">SEND</button>
+        </div>
+      </div>
+      <div class="right">
+        <div class="rightTop">
+          <div class="personList" v-for="(item,index) in person" :key="index">
+            <img class="icon" :src="item.usericon" alt="" />
+            <div>{{item.username}}</div>
+          </div>
+        </div>
+        <div class="rightBottom" @click="reset">RESET ALL</div>
+      </div>
+    </div>
+    <script>
+      let socket
+      const App = new Vue({
+        el: "#app",
+        data() {
+          return {
+            person: [],
+            message: "",
+            messageList: [],
+            username: "",
+            usericon: "",
+          }
+        },
+        created() {
+          this.username = localStorage.getItem("username")
+          this.usericon = localStorage.getItem("usericon")
+          this.messageList = JSON.parse(
+            localStorage.getItem("localMessage") || "[]"
+          )
+        },
+        mounted() {
+          socket = io("http://localhost:3333")
+
+          socket.on("setPerson", (data) => {
+            console.log(data)
+            this.person = data
+          })
+
+          socket.on("setMessage", (data) => {
+            this.messageList = [...this.messageList, data]
+            localStorage.setItem(
+              "localMessage",
+              JSON.stringify(this.messageList)
+            )
+          })
+        },
+        methods: {
+          genRandomString(len) {
+            let rdmString = ""
+            while (rdmString.length < len) {
+              rdmString += ((Math.random() * 37) | 0).toString(36)
+            }
+            return rdmString
+          },
+          commit() {
+            const { message, username, usericon } = this
+            if (message) {
+              socket.emit("commit", {
+                message,
+                username,
+                usericon,
+                time: new Date().getTime(),
+              })
+              this.message = ""
+            }
+          },
+          reset() {
+            localStorage.removeItem("username")
+            localStorage.removeItem("usericon")
+            localStorage.removeItem("localMessage")
+            window.location.reload()
+          },
+        },
+      })
+    </script>
+  </body>
+</html>
